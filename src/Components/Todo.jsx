@@ -127,8 +127,9 @@ function TodoApp() {
     // Find the current todo and update its Title
     const currentTodo = todos.find((todo) => todo.id === id);
     const updatedTodo = {
-      ...currentTodo,
+     
       Title: editTodoText,
+      IsComplete:currentTodo.completed
     };
 
     try {
