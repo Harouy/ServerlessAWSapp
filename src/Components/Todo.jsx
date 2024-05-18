@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 function TodoApp() {
   // State for storing the list of todos
@@ -9,52 +9,160 @@ function TodoApp() {
   const [editTodoId, setEditTodoId] = useState(null);
   const [editTodoText, setEditTodoText] = useState("");
 
+  // Fetch all todos from the server when the component mounts
+  useEffect(() => {
+    fetchTodos();
+  }, []);
+
+  const fetchTodos = async () => {
+    try {
+      const response = await fetch(
+        "https://i7jp8dpk22.execute-api.us-east-1.amazonaws.com/todos"
+      );
+      const data = await response.json();
+      const formattedTodos = data.map((todo) => ({
+        id: todo.todoId.N,
+        text: todo.Title.S,
+        completed: todo.IsComplete.BOOL,
+      }));
+      setTodos(formattedTodos);
+    } catch (error) {
+      console.error("Error fetching todos:", error);
+    }
+  };
+
   // Function to handle adding a new todo
-  const addTodo = () => {
+  const addTodo = async () => {
     if (inputValue.trim() !== "") {
-      setTodos([
-        ...todos,
-        { id: todos.length + 1, text: inputValue, completed: false },
-      ]);
-      setInputValue("");
+      const newTodo = { title: inputValue };
+      try {
+        const response = await fetch(
+          "https://i7jp8dpk22.execute-api.us-east-1.amazonaws.com/addtodo",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(newTodo),
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Error adding todo");
+        }
+
+        // Fetch the updated list of todos
+        fetchTodos();
+
+        setInputValue("");
+      } catch (error) {
+        console.error("Error adding todo:", error);
+      }
     }
   };
 
   // Function to handle removing a todo
-  const removeTodo = (id) => {
-    setTodos(todos.filter((todo) => todo.id !== id));
+  const removeTodo = async (todoId) => {
+    try {
+      await fetch(
+        `https://i7jp8dpk22.execute-api.us-east-1.amazonaws.com/deletetodo/${todoId}`,
+        {
+          method: "DELETE",
+        }
+      );
+      setTodos(todos.filter((todo) => todo.id !== todoId));
+    } catch (error) {
+      console.error("Error deleting todo:", error);
+    }
   };
 
-  // Function to toggle todo completion status
-  const toggleTodoCompletion = (id) => {
-    setTodos(
-      todos.map((todo) => {
-        if (todo.id === id) {
-          return { ...todo, completed: !todo.completed };
+  const toggleTodoCompletion = async (todoId) => {
+    const todo = todos.find((todo) => todo.id === todoId);
+    const updatedTodo = {
+      Title: todo.text,
+      IsComplete: !todo.completed, // Toggle the completion status
+    };
+    console.log(updatedTodo);
+
+    try {
+      const response = await fetch(
+        `https://i7jp8dpk22.execute-api.us-east-1.amazonaws.com/todos/${todoId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedTodo),
         }
-        return todo;
-      })
-    );
+      );
+
+      const result = await response.json();
+      /*  setTodos(
+        todos.map((todo) =>
+          todo.id === todoId ? { ...todo, ...result } : todo
+        )
+      );*/
+      setTodos(
+        todos.map((todo) =>
+          todo.id === todoId
+            ? {
+                ...todo,
+                completed: result.IsComplete,
+              }
+            : todo
+        )
+      );
+    } catch (error) {
+      console.error("Error updating todo:", error);
+    }
   };
 
   // Function to start editing a todo
-  const startEditTodo = (id, text) => {
-    setEditTodoId(id);
-    setEditTodoText(text);
+  const startEditTodo = (todoId, Title) => {
+    setEditTodoId(todoId);
+    setEditTodoText(Title);
   };
 
-  // Function to finish editing a todo
-  const finishEditTodo = (id) => {
-    setTodos(
-      todos.map((todo) => {
-        if (todo.id === id) {
-          return { ...todo, text: editTodoText };
+  const finishEditTodo = async (id) => {
+    // Find the current todo and update its Title
+    const currentTodo = todos.find((todo) => todo.id === id);
+    const updatedTodo = {
+      ...currentTodo,
+      Title: editTodoText,
+    };
+
+    try {
+      const response = await fetch(
+        `https://i7jp8dpk22.execute-api.us-east-1.amazonaws.com/todos/${id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedTodo),
         }
-        return todo;
-      })
-    );
-    setEditTodoId(null);
-    setEditTodoText("");
+      );
+
+      // Capture the updated todo object from the response
+      const result = await response.json();
+      console.log(result);
+
+      setTodos(
+        todos.map((todo) =>
+          todo.id === id
+            ? {
+                ...todo,
+                text: result.Title,
+              }
+            : todo
+        )
+      );
+
+      setEditTodoId(null);
+      setEditTodoText("");
+    } catch (error) {
+      console.error("Error updating todo:", error);
+    }
   };
 
   return (
